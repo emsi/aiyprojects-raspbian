@@ -142,7 +142,6 @@ class SpeakShellCommandOutput(object):
             self.say(self.failure_text)
 
 
-
 # Example: Change the volume
 # ==========================
 #
@@ -155,7 +154,7 @@ class VolumeControl(object):
 
     """Changes the volume and says the new level."""
 
-    #GET_VOLUME = r'amixer get Master | grep "Front Left:" | sed "s/.*\[\([0-9]\+\)%\].*/\1/"'
+    # GET_VOLUME = r'amixer get Master | grep "Front Left:" | sed "s/.*\[\([0-9]\+\)%\].*/\1/"'
     GET_VOLUME = r'amixer get PCM | grep "Mono:" | sed "s/.*\[\([0-9]\+\)%\].*/\1/"'
     SET_VOLUME = 'amixer -q set PCM %d%%'
 
@@ -203,7 +202,9 @@ class RepeatAfterMe(object):
 import threading
 import re
 
+
 class OortBulb(object):
+
     """Communicates with bulb and speaks whatabout..."""
 
     def __init__(self, say):
@@ -213,20 +214,20 @@ class OortBulb(object):
         action = "oorttool -d {} STATUS".format(bulb)
         message = _("Checking {} status.".format(bulb))
         thr = threading.Thread(target=self.say, args=(message,))
-        thr.start() # will run say
+        thr.start()  # will run say
         output = subprocess.check_output(action, shell=True).strip().decode("utf-8").lower()
         print (output)
-        thr.join() # will wait till say is done
+        thr.join()  # will wait till say is done
         if output:
             self.say(output)
         elif self.failure_text:
-            self.say(_(message+" failed. Sorry dude."))
+            self.say(_(message + " failed. Sorry dude."))
 
     # comand syntax:
     # ON/OFF
     #   .*WYŁACZ żarówkę (name) / .*WŁĄCZ żarówkę (name)
-    #   .*TURN (name) bulb ON/OFF
-    #   .*SET (name) bulb ON/OFF
+    #   .*TURN ON/OFF (name) bulb|light
+    #   .*SET (name) bulb|light ON/OFF
     # STATUS command
     #   .*STATUS żarówki (name)
     #   .*(name) bulb STATUS
@@ -235,17 +236,24 @@ class OortBulb(object):
     #   .*SET (name) bulb BRIGHTNES .* NN .*
 
     def run(self, voice_command):
-        voice_command=voice_command.lower()
+        voice_command = voice_command.lower()
         print (voice_command)
 #            parse=re.compile("^([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)")
 #            vlan_config=re.findall(parse,re.sub(cleanup,"",line))[0]
-#            # parse known variables
+# parse known variables
 #            eth,vlanid,ip,mask,rate=vlan_config[:5]
-        
-        # ON/OFF regexp
-        re_onoff=re.compile("^.*(włącz|wyłącz) żarówkę ([^\s]*)")
-        (command, bulb) = re.findall(re_onoff,voice_command)[0]
 
+        # ON/OFF regexp
+        re_onoff = re.compile("^.*(włącz|wyłącz) żarówkę ([^\s]*)")
+        (command, bulb) = re.findall(re_onoff, voice_command)[0]
+
+        print (bulb, command)
+        re_onoff = re.compile("^.*set ([^\s]*) (bulb|light|lights) (on|off)")
+        (bulb, _, command) = re.findall(re_onoff, voice_command)[0]
+        print (bulb, command)
+        re_onoff = re.compile("^.*turn (on|off) ([^\s]*) (bulb|light|lights)")
+        (bulb, command, _) = re.findall(re_onoff, voice_command)[0]
+        print (bulb, command)
 
 #        print(re.sub(r'żarów[^ ]+', '', voice_command))
 #        print(re.sub(r'bulb[^ ]+', '', voice_command))
@@ -276,6 +284,8 @@ def make_actor(say):
         _('Ups.. It went wrong!')))
 
     actor.add_keyword(_('żarówk'), OortBulb(say))
+    actor.add_keyword(_('light'), OortBulb(say))
+    actor.add_keyword(_('bulb'), OortBulb(say))
 
     return actor
 

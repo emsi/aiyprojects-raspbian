@@ -135,11 +135,12 @@ class SpeakShellCommandOutput(object):
         self.failure_text = failure_text
 
     def run(self, voice_command):
-        output = subprocess.check_output(self.shell_command, shell=True).strip()
+        output = subprocess.check_output(self.shell_command, shell=True).strip().decode("utf-8")
         if output:
             self.say(output)
         elif self.failure_text:
             self.say(self.failure_text)
+
 
 
 # Example: Change the volume
@@ -154,8 +155,9 @@ class VolumeControl(object):
 
     """Changes the volume and says the new level."""
 
-    GET_VOLUME = r'amixer get Master | grep "Front Left:" | sed "s/.*\[\([0-9]\+\)%\].*/\1/"'
-    SET_VOLUME = 'amixer -q set Master %d%%'
+    #GET_VOLUME = r'amixer get Master | grep "Front Left:" | sed "s/.*\[\([0-9]\+\)%\].*/\1/"'
+    GET_VOLUME = r'amixer get PCM | grep "Mono:" | sed "s/.*\[\([0-9]\+\)%\].*/\1/"'
+    SET_VOLUME = 'amixer -q set PCM %d%%'
 
     def __init__(self, say, change):
         self.say = say
@@ -198,6 +200,56 @@ class RepeatAfterMe(object):
 # Makers! Implement your own actions here.
 # =========================================
 
+import threading
+import re
+
+class OortBulb(object):
+    """Communicates with bulb and speaks whatabout..."""
+
+    def __init__(self, say):
+        self.say = say
+
+    def check_status(self, bulb):
+        action = "oorttool -d {} STATUS".format(bulb)
+        message = _("Checking {} status.".format(bulb))
+        thr = threading.Thread(target=self.say, args=(message,))
+        thr.start() # will run say
+        output = subprocess.check_output(action, shell=True).strip().decode("utf-8").lower()
+        print (output)
+        thr.join() # will wait till say is done
+        if output:
+            self.say(output)
+        elif self.failure_text:
+            self.say(_(message+" failed. Sorry dude."))
+
+    # comand syntax:
+    # ON/OFF
+    #   .*WYŁACZ żarówkę (name) / .*WŁĄCZ żarówkę (name)
+    #   .*TURN (name) bulb ON/OFF
+    #   .*SET (name) bulb ON/OFF
+    # STATUS command
+    #   .*STATUS żarówki (name)
+    #   .*(name) bulb STATUS
+    # SET BRIGHTNESS commans
+    #   .*USTAW JASNOŚĆ żarówki (name) .* NN .*
+    #   .*SET (name) bulb BRIGHTNES .* NN .*
+
+    def run(self, voice_command):
+        voice_command=voice_command.lower()
+        print (voice_command)
+#            parse=re.compile("^([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)")
+#            vlan_config=re.findall(parse,re.sub(cleanup,"",line))[0]
+#            # parse known variables
+#            eth,vlanid,ip,mask,rate=vlan_config[:5]
+        
+        # ON/OFF regexp
+        re_onoff=re.compile("^.*(włącz|wyłącz) żarówkę ([^\s]*)")
+        (command, bulb) = re.findall(re_onoff,voice_command)[0]
+
+
+#        print(re.sub(r'żarów[^ ]+', '', voice_command))
+#        print(re.sub(r'bulb[^ ]+', '', voice_command))
+
 
 def make_actor(say):
     """Create an actor to carry out the user's commands."""
@@ -219,6 +271,11 @@ def make_actor(say):
     # =========================================
     # Makers! Add your own voice commands here.
     # =========================================
+    actor.add_keyword(_('żarówka kuchnia'), SpeakShellCommandOutput(
+        say, "oorttool -d kitchen STATUS",
+        _('Ups.. It went wrong!')))
+
+    actor.add_keyword(_('żarówk'), OortBulb(say))
 
     return actor
 
@@ -247,5 +304,6 @@ would conflict with the First Law.
 conflict with the First or Second Law."""))
     simple_command(_('where are you from'), _("A galaxy far, far, just kidding. I'm from Seattle."))
     simple_command(_('your name'), _('A machine has no name'))
+    simple_command(_('która godzina'), _('W pół do komina'))
 
     actor.add_keyword(_('time'), SpeakTime(say))
